@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RESTfullAPI.Models;
@@ -127,6 +128,42 @@ namespace RESTfullAPI.Controllers
 
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        //PATCH: api/Products/5
+        [HttpPatch("{id}")]
+        public async Task<IActionResult> PatchProduct(short id, JsonPatchDocument<Product> patchDocument)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                return NotFound();
+            }
+
+            patchDocument.ApplyTo(product, ModelState);
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!ProductExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
 
             return NoContent();
         }
