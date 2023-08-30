@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RESTfullAPI.Data_Transfer_Objects;
 using RESTfullAPI.Models;
 
 namespace RESTfullAPI.Controllers
@@ -25,23 +26,31 @@ namespace RESTfullAPI.Controllers
 
         // GET: api/Products
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+        public async Task<ActionResult<IEnumerable<ProductDTO>>> GetProducts()
         {
-          if (_context.Products == null)
-          {
-              return NotFound();
-          }
-            return await _context.Products.ToListAsync();
+            var products = await _context.Products.ToListAsync();
+
+            if (products == null)
+            {
+                return NotFound();
+            }
+
+            // Create a list of ProductDTO objects for response
+            var productDTOs = products.Select(product => new ProductDTO
+            {
+                ProductId = product.ProductId,
+                ProductName = product.ProductName,
+                ProductDescription = product.ProductDescription,
+                UnitsInStock = product.UnitsInStock
+            }).ToList();
+
+            return productDTOs;
         }
 
         // GET: api/Products/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetProduct(short id)
+        public async Task<ActionResult<ProductDTO>> GetProduct(short id)
         {
-          if (_context.Products == null)
-          {
-              return NotFound();
-          }
             var product = await _context.Products.FindAsync(id);
 
             if (product == null)
@@ -49,20 +58,40 @@ namespace RESTfullAPI.Controllers
                 return NotFound();
             }
 
-            return product;
+            // Create a ProductDTO object for response
+            var productDTO = new ProductDTO
+            {
+                ProductId = product.ProductId,
+                ProductName = product.ProductName,
+                ProductDescription = product.ProductDescription,
+                UnitsInStock = product.UnitsInStock
+            };
+
+            return productDTO;
         }
 
         // PUT: api/Products/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(short id, Product product)
+        public async Task<IActionResult> PutProduct(short id, ProductDTO productDTO)
         {
-            if (id != product.ProductId)
+            if (id != productDTO.ProductId)
             {
                 return BadRequest();
             }
 
-            _context.Entry(product).State = EntityState.Modified;
+            if (!ProductExists(id))
+            {
+                return NotFound();
+            }
+
+            // Retrieve the existing product entity
+            var product = await _context.Products.FindAsync(id);
+
+            // Update the product properties from the DTO
+            product.ProductName = productDTO.ProductName;
+            product.ProductDescription = productDTO.ProductDescription;
+            product.UnitsInStock = productDTO.UnitsInStock;
 
             try
             {
@@ -86,12 +115,22 @@ namespace RESTfullAPI.Controllers
         // POST: api/Products
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Product>> PostProduct(Product product)
+        public async Task<ActionResult<ProductDTO>> PostProduct(ProductDTO productDTO)
         {
-          if (_context.Products == null)
-          {
-              return Problem("Entity set 'project2sqldbContext.Products'  is null.");
-          }
+            if (_context.Products == null)
+            {
+                return Problem("Entity set 'project2sqldbContext.Products' is null.");
+            }
+
+            // Create a Product entity from the DTO
+            var product = new Product
+            {
+                ProductId = productDTO.ProductId,
+                ProductName = productDTO.ProductName,
+                ProductDescription = productDTO.ProductDescription,
+                UnitsInStock = productDTO.UnitsInStock
+            };
+
             _context.Products.Add(product);
             try
             {
@@ -109,23 +148,28 @@ namespace RESTfullAPI.Controllers
                 }
             }
 
-            return CreatedAtAction("GetProduct", new { id = product.ProductId }, product);
+            // Create a ProductDTO object for the response
+            var createdProductDTO = new ProductDTO
+            {
+                ProductId = product.ProductId,
+                ProductName = product.ProductName,
+                ProductDescription = product.ProductDescription,
+                UnitsInStock = product.UnitsInStock
+            };
+
+            return CreatedAtAction("GetProduct", new { id = createdProductDTO.ProductId }, createdProductDTO);
         }
 
         // DELETE: api/Products/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(short id)
         {
-            if (_context.Products == null)
-            {
-                return NotFound();
-            }
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            if (!ProductExists(id))
             {
                 return NotFound();
             }
 
+            var product = await _context.Products.FindAsync(id);
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
 

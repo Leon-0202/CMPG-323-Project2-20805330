@@ -12,7 +12,7 @@ using RESTfullAPI.Models;
 
 namespace RESTfullAPI.Controllers
 {
-    //[Authorize]
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class CustomersController : ControllerBase
@@ -30,7 +30,7 @@ namespace RESTfullAPI.Controllers
         {
             var customers = await _context.Customers.ToListAsync();
 
-            if (customers == null || !customers.Any())
+            if (customers == null)
             {
                 return NotFound();
             }
@@ -118,6 +118,11 @@ namespace RESTfullAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<Customer>> PostCustomer(CustomerDTO customerDTO)
         {
+            if (_context.Customers == null)
+            {
+                return Problem("Entity set 'project2sqldbContext.Customers' is null.");
+            }
+
             var customer = new Customer
             {
                 CustomerId = customerDTO.CustomerId,
