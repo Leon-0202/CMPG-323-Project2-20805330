@@ -13,7 +13,7 @@ using static NuGet.Packaging.PackagingConstants;
 
 namespace RESTfullAPI.Controllers
 {
-    //[Authorize]
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class OrdersController : ControllerBase
