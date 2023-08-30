@@ -12,7 +12,7 @@ using RESTfullAPI.Models;
 
 namespace RESTfullAPI.Controllers
 {
-    //[Authorize]
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class CustomersController : ControllerBase
