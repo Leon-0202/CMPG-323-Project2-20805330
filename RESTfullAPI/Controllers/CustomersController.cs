@@ -7,11 +7,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RESTfullAPI.Data_Transfer_Objects;
 using RESTfullAPI.Models;
 
 namespace RESTfullAPI.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class CustomersController : ControllerBase
@@ -25,23 +26,32 @@ namespace RESTfullAPI.Controllers
 
         // GET: api/Customers
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
+        public async Task<ActionResult<IEnumerable<CustomerDTO>>> GetCustomers()
         {
-          if (_context.Customers == null)
-          {
-              return NotFound();
-          }
-            return await _context.Customers.ToListAsync();
+            var customers = await _context.Customers.ToListAsync();
+
+            if (customers == null || !customers.Any())
+            {
+                return NotFound();
+            }
+
+            // Create a list of CustomerDTO objects for response
+            var customerDTOs = customers.Select(customer => new CustomerDTO
+            {
+                CustomerId = customer.CustomerId,
+                CustomerTitle = customer.CustomerTitle,
+                CustomerName = customer.CustomerName,
+                CustomerSurname = customer.CustomerSurname,
+                CellPhone = customer.CellPhone
+            }).ToList();
+
+            return customerDTOs;
         }
 
         // GET: api/Customers/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Customer>> GetCustomer(short id)
+        public async Task<ActionResult<CustomerDTO>> GetCustomer(short id)
         {
-          if (_context.Customers == null)
-          {
-              return NotFound();
-          }
             var customer = await _context.Customers.FindAsync(id);
 
             if (customer == null)
@@ -49,20 +59,40 @@ namespace RESTfullAPI.Controllers
                 return NotFound();
             }
 
-            return customer;
+            // Create a CustomerDTO object for response
+            var customerDTO = new CustomerDTO
+            {
+                CustomerId = customer.CustomerId,
+                CustomerTitle = customer.CustomerTitle,
+                CustomerName = customer.CustomerName,
+                CustomerSurname = customer.CustomerSurname,
+                CellPhone = customer.CellPhone
+            };
+
+            return customerDTO;
         }
 
         // PUT: api/Customers/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutCustomer(short id, Customer customer)
+        public async Task<IActionResult> PutCustomer(short id, CustomerDTO customerDTO)
         {
-            if (id != customer.CustomerId)
+            if (id != customerDTO.CustomerId)
             {
                 return BadRequest();
             }
 
-            _context.Entry(customer).State = EntityState.Modified;
+            if (!CustomerExists(id))
+            {
+                return NotFound();
+            }
+
+            // Update customer properties and save changes
+            var customer = await _context.Customers.FindAsync(id);
+            customer.CustomerTitle = customerDTO.CustomerTitle;
+            customer.CustomerName = customerDTO.CustomerName;
+            customer.CustomerSurname = customerDTO.CustomerSurname;
+            customer.CellPhone = customerDTO.CellPhone;
 
             try
             {
@@ -86,12 +116,17 @@ namespace RESTfullAPI.Controllers
         // POST: api/Customers
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Customer>> PostCustomer(Customer customer)
+        public async Task<ActionResult<Customer>> PostCustomer(CustomerDTO customerDTO)
         {
-          if (_context.Customers == null)
-          {
-              return Problem("Entity set 'project2sqldbContext.Customers'  is null.");
-          }
+            var customer = new Customer
+            {
+                CustomerId = customerDTO.CustomerId,
+                CustomerTitle = customerDTO.CustomerTitle,
+                CustomerName = customerDTO.CustomerName,
+                CustomerSurname = customerDTO.CustomerSurname,
+                CellPhone = customerDTO.CellPhone
+            };
+
             _context.Customers.Add(customer);
             try
             {
@@ -99,33 +134,32 @@ namespace RESTfullAPI.Controllers
             }
             catch (DbUpdateException)
             {
-                if (CustomerExists(customer.CustomerId))
-                {
-                    return Conflict();
-                }
-                else
-                {
-                    throw;
-                }
+                return Conflict();
             }
 
-            return CreatedAtAction("GetCustomer", new { id = customer.CustomerId }, customer);
+            // Create the corresponding DTO for the response
+            var createdCustomerDTO = new CustomerDTO
+            {
+                CustomerId = customer.CustomerId,
+                CustomerTitle = customerDTO.CustomerTitle,
+                CustomerName = customer.CustomerName,
+                CustomerSurname = customer.CustomerSurname,
+                CellPhone = customer.CellPhone
+            };
+
+            return CreatedAtAction(nameof(GetCustomer), new { id = customer.CustomerId }, createdCustomerDTO);
         }
 
         // DELETE: api/Customers/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCustomer(short id)
         {
-            if (_context.Customers == null)
-            {
-                return NotFound();
-            }
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer == null)
+            if (!CustomerExists(id))
             {
                 return NotFound();
             }
 
+            var customer = await _context.Customers.FindAsync(id);
             _context.Customers.Remove(customer);
             await _context.SaveChangesAsync();
 
