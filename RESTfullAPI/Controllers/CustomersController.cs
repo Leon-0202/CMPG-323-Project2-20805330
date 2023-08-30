@@ -12,7 +12,7 @@ using RESTfullAPI.Models;
 
 namespace RESTfullAPI.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class CustomersController : ControllerBase
@@ -146,7 +146,7 @@ namespace RESTfullAPI.Controllers
             var createdCustomerDTO = new CustomerDTO
             {
                 CustomerId = customer.CustomerId,
-                CustomerTitle = customerDTO.CustomerTitle,
+                CustomerTitle = customer.CustomerTitle,
                 CustomerName = customer.CustomerName,
                 CustomerSurname = customer.CustomerSurname,
                 CellPhone = customer.CellPhone

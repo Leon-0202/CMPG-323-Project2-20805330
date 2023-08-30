@@ -9,10 +9,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RESTfullAPI.Data_Transfer_Objects;
 using RESTfullAPI.Models;
+using static NuGet.Packaging.PackagingConstants;
 
 namespace RESTfullAPI.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class OrdersController : ControllerBase
@@ -47,6 +48,7 @@ namespace RESTfullAPI.Controllers
                 OrderDetails = order.OrderDetails.Select(detail => new OrderDetailDTO
                 {
                     OrderDetailsId = detail.OrderDetailsId,
+                    OrderId = detail.OrderId,
                     ProductId = detail.ProductId,
                     Quantity = detail.Quantity,
                     Discount = detail.Discount
@@ -260,11 +262,11 @@ namespace RESTfullAPI.Controllers
 
         //GET Orders related to a Customer
         [HttpGet("customer/{customerId}")]
-        public async Task<ActionResult<IEnumerable<Order>>> GetOrdersForCustomer(short customerId)
+        public async Task<ActionResult<IEnumerable<OrderDTO>>> GetOrdersForCustomer(short customerId)
         {
             var ordersForCustomer = await _context.Orders
                 .Where(o => o.CustomerId == customerId)
-                .Include(o => o.Customer)
+                .Include(o => o.OrderDetails)
                 .ToListAsync();
 
             if (ordersForCustomer == null || !ordersForCustomer.Any())
@@ -272,7 +274,24 @@ namespace RESTfullAPI.Controllers
                 return NotFound();
             }
 
-            return ordersForCustomer;
+            // Create a list of OrderDTO objects for response
+            var orderDTOs = ordersForCustomer.Select(order => new OrderDTO
+            {
+                OrderId = order.OrderId,
+                OrderDate = order.OrderDate,
+                CustomerId = order.CustomerId,
+                DeliveryAddress = order.DeliveryAddress,
+                OrderDetails = order.OrderDetails.Select(detail => new OrderDetailDTO
+                {
+                    OrderDetailsId = detail.OrderDetailsId,
+                    OrderId = detail.OrderId,
+                    ProductId = detail.ProductId,
+                    Quantity = detail.Quantity,
+                    Discount = detail.Discount
+                }).ToList()
+            }).ToList();
+
+            return orderDTOs;
         }
 
         private bool OrderExists(short id)
