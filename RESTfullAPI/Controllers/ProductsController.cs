@@ -212,6 +212,23 @@ namespace RESTfullAPI.Controllers
             return NoContent();
         }
 
+        //GET Products related to an Order
+        [HttpGet("order/{orderId}")]
+        public async Task<ActionResult<IEnumerable<Product>>> GetProductsForOrder(short orderId)
+        {
+            var productsForOrder = await _context.OrderDetails
+                .Where(od => od.OrderId == orderId)
+                .Select(od => od.Product)
+                .ToListAsync();
+
+            if (productsForOrder == null || !productsForOrder.Any())
+            {
+                return NotFound();
+            }
+
+            return productsForOrder;
+        }
+
         private bool ProductExists(short id)
         {
             return (_context.Products?.Any(e => e.ProductId == id)).GetValueOrDefault();

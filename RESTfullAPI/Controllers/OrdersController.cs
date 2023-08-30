@@ -28,7 +28,9 @@ namespace RESTfullAPI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderDTO>>> GetOrders()
         {
-            var orders = await _context.Orders.ToListAsync();
+            var orders = await _context.Orders
+                .Include(o => o.OrderDetails)
+                .ToListAsync();
 
             if (orders == null)
             {
@@ -41,8 +43,15 @@ namespace RESTfullAPI.Controllers
                 OrderId = order.OrderId,
                 OrderDate = order.OrderDate,
                 CustomerId = order.CustomerId,
-                DeliveryAddress = order.DeliveryAddress
-        }).ToList();
+                DeliveryAddress = order.DeliveryAddress,
+                OrderDetails = order.OrderDetails.Select(detail => new OrderDetailDTO
+                {
+                    OrderDetailsId = detail.OrderDetailsId,
+                    ProductId = detail.ProductId,
+                    Quantity = detail.Quantity,
+                    Discount = detail.Discount
+                }).ToList()
+            }).ToList();
 
             return orderDTOs;
         }
@@ -51,20 +60,29 @@ namespace RESTfullAPI.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<OrderDTO>> GetOrder(short id)
         {
-            var order = await _context.Orders.FindAsync(id);
+            var order = await _context.Orders
+                .Include(o => o.OrderDetails)
+                .FirstOrDefaultAsync(o => o.OrderId == id);
 
             if (order == null)
             {
                 return NotFound();
             }
 
-            // Create an OrderDTO object for response
+            // Create an OrderDTO object for the response
             var orderDTO = new OrderDTO
             {
                 OrderId = order.OrderId,
                 OrderDate = order.OrderDate,
                 CustomerId = order.CustomerId,
-                DeliveryAddress = order.DeliveryAddress
+                DeliveryAddress = order.DeliveryAddress,
+                OrderDetails = order.OrderDetails.Select(detail => new OrderDetailDTO
+                {
+                    OrderDetailsId = detail.OrderDetailsId,
+                    ProductId = detail.ProductId,
+                    Quantity = detail.Quantity,
+                    Discount = detail.Discount
+                }).ToList()
             };
 
             return orderDTO;
@@ -75,7 +93,7 @@ namespace RESTfullAPI.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutOrder(short id, OrderDTO orderDTO)
         {
-            if (id != orderDTO.OrderId)
+            if (!OrderExists(id))
             {
                 return BadRequest("Order ID mismatch.");
             }
@@ -187,7 +205,7 @@ namespace RESTfullAPI.Controllers
         public async Task<IActionResult> DeleteOrder(short id)
         {
             var order = await _context.Orders.FindAsync(id);
-            if (order == null)
+            if ((!OrderExists(id)))
             {
                 return NotFound($"Order with ID {id} not found.");
             }
@@ -238,6 +256,23 @@ namespace RESTfullAPI.Controllers
             }
 
             return NoContent();
+        }
+
+        //GET Orders related to a Customer
+        [HttpGet("customer/{customerId}")]
+        public async Task<ActionResult<IEnumerable<Order>>> GetOrdersForCustomer(short customerId)
+        {
+            var ordersForCustomer = await _context.Orders
+                .Where(o => o.CustomerId == customerId)
+                .Include(o => o.Customer)
+                .ToListAsync();
+
+            if (ordersForCustomer == null || !ordersForCustomer.Any())
+            {
+                return NotFound();
+            }
+
+            return ordersForCustomer;
         }
 
         private bool OrderExists(short id)
