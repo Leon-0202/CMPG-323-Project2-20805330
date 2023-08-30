@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RESTfullAPI.Data_Transfer_Objects;
 using RESTfullAPI.Models;
 
 namespace RESTfullAPI.Controllers
@@ -25,23 +26,31 @@ namespace RESTfullAPI.Controllers
 
         // GET: api/Orders
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
+        public async Task<ActionResult<IEnumerable<OrderDTO>>> GetOrders()
         {
-          if (_context.Orders == null)
-          {
-              return NotFound();
-          }
-            return await _context.Orders.ToListAsync();
+            var orders = await _context.Orders.ToListAsync();
+
+            if (orders == null)
+            {
+                return NotFound();
+            }
+
+            // Create a list of OrderDTO objects for response
+            var orderDTOs = orders.Select(order => new OrderDTO
+            {
+                OrderId = order.OrderId,
+                OrderDate = order.OrderDate,
+                CustomerId = order.CustomerId,
+                DeliveryAddress = order.DeliveryAddress
+        }).ToList();
+
+            return orderDTOs;
         }
 
         // GET: api/Orders/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Order>> GetOrder(short id)
+        public async Task<ActionResult<OrderDTO>> GetOrder(short id)
         {
-          if (_context.Orders == null)
-          {
-              return NotFound();
-          }
             var order = await _context.Orders.FindAsync(id);
 
             if (order == null)
@@ -49,36 +58,76 @@ namespace RESTfullAPI.Controllers
                 return NotFound();
             }
 
-            return order;
+            // Create an OrderDTO object for response
+            var orderDTO = new OrderDTO
+            {
+                OrderId = order.OrderId,
+                OrderDate = order.OrderDate,
+                CustomerId = order.CustomerId,
+                DeliveryAddress = order.DeliveryAddress
+            };
+
+            return orderDTO;
         }
 
         // PUT: api/Orders/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutOrder(short id, Order order)
+        public async Task<IActionResult> PutOrder(short id, OrderDTO orderDTO)
         {
-            if (id != order.OrderId)
+            if (id != orderDTO.OrderId)
             {
-                return BadRequest();
+                return BadRequest("Order ID mismatch.");
             }
 
-            _context.Entry(order).State = EntityState.Modified;
+            var existingOrder = await _context.Orders.FindAsync(id);
+            if (existingOrder == null)
+            {
+                return NotFound($"Order with ID {id} not found.");
+            }
 
-            try
+            if (_context.Customers == null || _context.Products == null)
             {
-                await _context.SaveChangesAsync();
+                return Problem("Entity sets are null.");
             }
-            catch (DbUpdateConcurrencyException)
+
+            var customer = await _context.Customers.FindAsync(orderDTO.CustomerId);
+            if (customer == null)
             {
-                if (!OrderExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return NotFound($"Customer with ID {orderDTO.CustomerId} not found.");
             }
+
+            // Update existing order properties
+            existingOrder.OrderDate = orderDTO.OrderDate;
+            existingOrder.CustomerId = orderDTO.CustomerId;
+            existingOrder.DeliveryAddress = orderDTO.DeliveryAddress;
+
+            // Remove existing order details
+            var existingOrderDetails = await _context.OrderDetails.Where(od => od.OrderId == id).ToListAsync();
+            _context.OrderDetails.RemoveRange(existingOrderDetails);
+
+            // Add updated order details
+            foreach (var orderDetailDTO in orderDTO.OrderDetails)
+            {
+                var product = await _context.Products.FindAsync(orderDetailDTO.ProductId);
+                if (product == null)
+                {
+                    return NotFound($"Product with ID {orderDetailDTO.ProductId} not found.");
+                }
+
+                var orderDetail = new OrderDetail
+                {
+                    OrderId = id,
+                    OrderDetailsId = orderDetailDTO.OrderId,
+                    ProductId = orderDetailDTO.ProductId,
+                    Quantity = orderDetailDTO.Quantity,
+                    Discount = orderDetailDTO.Discount
+                };
+
+                _context.OrderDetails.Add(orderDetail);
+            }
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -86,28 +135,49 @@ namespace RESTfullAPI.Controllers
         // POST: api/Orders
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Order>> PostOrder(Order order)
+        public async Task<ActionResult<Order>> PostOrder(OrderDTO orderDTO)
         {
-          if (_context.Orders == null)
-          {
-              return Problem("Entity set 'project2sqldbContext.Orders'  is null.");
-          }
+            if (_context.Customers == null || _context.Products == null)
+            {
+                return Problem("Entity sets are null.");
+            }
+
+            var customer = await _context.Customers.FindAsync(orderDTO.CustomerId);
+            if (customer == null)
+            {
+                return NotFound($"Customer with ID {orderDTO.CustomerId} not found.");
+            }
+
+            var order = new Order
+            {
+                OrderId = orderDTO.OrderId,
+                OrderDate = orderDTO.OrderDate,
+                CustomerId = orderDTO.CustomerId,
+                DeliveryAddress = orderDTO.DeliveryAddress
+            };
+
+            foreach (var orderDetailDTO in orderDTO.OrderDetails)
+            {
+                var product = await _context.Products.FindAsync(orderDetailDTO.ProductId);
+                if (product == null)
+                {
+                    return NotFound($"Product with ID {orderDetailDTO.ProductId} not found.");
+                }
+
+                var orderDetail = new OrderDetail
+                {
+                    OrderId = order.OrderId,
+                    OrderDetailsId = orderDetailDTO.OrderDetailsId,
+                    ProductId = orderDetailDTO.ProductId,
+                    Quantity = orderDetailDTO.Quantity,
+                    Discount = orderDetailDTO.Discount
+                };
+
+                _context.OrderDetails.Add(orderDetail);
+            }
+
             _context.Orders.Add(order);
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                if (OrderExists(order.OrderId))
-                {
-                    return Conflict();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetOrder", new { id = order.OrderId }, order);
         }
@@ -116,17 +186,19 @@ namespace RESTfullAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteOrder(short id)
         {
-            if (_context.Orders == null)
-            {
-                return NotFound();
-            }
             var order = await _context.Orders.FindAsync(id);
             if (order == null)
             {
-                return NotFound();
+                return NotFound($"Order with ID {id} not found.");
             }
 
+            // Delete related OrderDetails first
+            var relatedOrderDetails = _context.OrderDetails.Where(od => od.OrderId == id);
+            _context.OrderDetails.RemoveRange(relatedOrderDetails);
+
+            // Remove the order itself
             _context.Orders.Remove(order);
+
             await _context.SaveChangesAsync();
 
             return NoContent();
