@@ -1,10 +1,15 @@
 ## Table of contents
 
+- [API Link](api-link)
 - [WebAPI Overview](#webapi-overview)
 - [Authentication](#authentication) 
 - [List of Endpoints](#list-of-endpoints) 
 - [Stretch Tasks](#stretch-tasks) 
-- [References](#references) 
+- [References](#references)
+
+## API Link
+The API can be accessed on Azure with the following link:\
+https://restfullapi.azurewebsites.net/index.html
 
 ## WebAPI Overview
 The WebAPI was created as, and makes use of the following core features:  
